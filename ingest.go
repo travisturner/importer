@@ -47,7 +47,12 @@ func (n *Ingester) Run() error {
 		go func() {
 			defer pwg.Done()
 			var recordErr error
+			ii := 0
 			for {
+				if ii > 3000000 {
+					return
+				}
+				ii++
 				// Source
 				var rec interface{}
 				rec, recordErr = n.src.Record()
@@ -59,7 +64,6 @@ func (n *Ingester) Run() error {
 				pr := rec.(*pdk.PilosaRecord)
 
 				// Index
-				n.Stats.Count("ingest.Map", 1, 1)
 				for _, row := range pr.Rows {
 					n.indexer.AddBit(row.Frame, pr.Col, row.ID)
 					n.Stats.Count("ingest.AddBit", 1, 1)

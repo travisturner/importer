@@ -20,12 +20,9 @@
 #  name = "github.com/x/y"
 #  version = "2.4.0"
 
-ignored = ["github.com/pilosa/pdk/fake/gen"]
+#ignored = ["github.com/pilosa/pdk/fake/gen"]
+ignored = ["github.com/pilosa/pdk*"]
 
-[[constraint]]
-  name = "github.com/Shopify/sarama"
-  branch = "master"
-
-[[constraint]]
-  name = "github.com/pilosa/pdk"
-  branch = "master"
+#[[constraint]]
+#  name = "github.com/pilosa/pdk"
+#  branch = "master"
