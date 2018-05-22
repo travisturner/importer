@@ -14,6 +14,8 @@ type Main struct {
 	PilosaHosts []string `help:"Comma separated list of Pilosa hosts and ports."`
 	Index       string   `help:"Pilosa index."`
 	BatchSize   uint     `help:"Batch size for Pilosa imports (latency/throughput tradeoff)."`
+	FrameCount  uint     `help:"Number of Frames to write single bits to."`
+	ValCount    uint     `help:"Number of Frames to write values to."`
 }
 
 // NewMain returns a new Main.
@@ -26,20 +28,22 @@ func NewMain() *Main {
 }
 
 type EventSource struct {
-	Frames []string
+	Frames []pdk.FrameSpec
 
 	count int
 }
 
 func (s *EventSource) Record() (interface{}, error) {
 	pr := &pdk.PilosaRecord{
-		//Col: uint64(rand.Intn(100000000)),
 		Col: uint64(s.count),
 	}
 	for _, f := range s.Frames {
-		pr.AddRow(f, uint64(rand.Intn(100)))
+		if len(f.Fields) == 0 {
+			pr.AddRow(f.Name, uint64(rand.Intn(100)))
+		} else {
+			pr.AddVal(f.Name, "fld", int64(rand.Intn(1000000)))
+		}
 	}
-	pr.AddVal("bb", "fld", int64(rand.Intn(100000)))
 	s.count++
 
 	if s.count%100000 == 0 {
@@ -51,25 +55,36 @@ func (s *EventSource) Record() (interface{}, error) {
 
 // Run begins indexing data into Pilosa.
 func (m *Main) Run() error {
-	src := &EventSource{
-		Frames: []string{"fa", "fb", "fc", "fd", "fe", "ff", "fg", "fh", "fi", "fj"},
+	frames := []pdk.FrameSpec{}
+
+	// Bit Frames
+	for i := 0; i < int(m.FrameCount); i++ {
+		frames = append(frames, pdk.FrameSpec{
+			Name:           fmt.Sprintf("f%d", i),
+			CacheSize:      0,
+			InverseEnabled: false,
+		})
 	}
 
-	fields := []pdk.FieldSpec{
-		pdk.FieldSpec{
-			Name: "fld",
-			Min:  0,
-			Max:  100000,
-		},
-	}
-
-	frames := []pdk.FrameSpec{
-		pdk.FrameSpec{
-			Name:           "bb",
+	// BSI Frames
+	for i := 0; i < int(m.ValCount); i++ {
+		fields := []pdk.FieldSpec{
+			pdk.FieldSpec{
+				Name: "fld",
+				Min:  0,
+				Max:  1000000,
+			},
+		}
+		frames = append(frames, pdk.FrameSpec{
+			Name:           fmt.Sprintf("v%d", i),
 			CacheSize:      0,
 			InverseEnabled: false,
 			Fields:         fields,
-		},
+		})
+	}
+
+	src := &EventSource{
+		Frames: frames,
 	}
 
 	//indexer, err := pdk.SetupPilosa(m.PilosaHosts, m.Index, []pdk.FrameSpec{}, m.BatchSize)
