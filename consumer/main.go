@@ -16,6 +16,7 @@ type Main struct {
 	BatchSize   uint     `help:"Batch size for Pilosa imports (latency/throughput tradeoff)."`
 	FrameCount  uint     `help:"Number of Frames to write single bits to."`
 	ValCount    uint     `help:"Number of Frames to write values to."`
+	ColCount    uint     `help:"Number of Columns to create."`
 }
 
 // NewMain returns a new Main.
@@ -24,6 +25,9 @@ func NewMain() *Main {
 		PilosaHosts: []string{"localhost:10101"},
 		Index:       "iot",
 		BatchSize:   1000,
+		FrameCount:  1,
+		ValCount:    1,
+		ColCount:    1000,
 	}
 }
 
@@ -93,6 +97,6 @@ func (m *Main) Run() error {
 		return errors.Wrap(err, "setting up Pilosa")
 	}
 
-	ingester := importer.NewIngester(src, indexer)
+	ingester := importer.NewIngester(src, indexer, m.ColCount)
 	return errors.Wrap(ingester.Run(), "running ingester")
 }

@@ -21,17 +21,21 @@ type Ingester struct {
 	src     pdk.Source
 	indexer pdk.Indexer
 
+	colCount uint
+
 	Stats pdk.Statter
 	Log   pdk.Logger
 }
 
 // NewIngester gets a new Ingester.
-func NewIngester(source pdk.Source, indexer pdk.Indexer) *Ingester {
+func NewIngester(source pdk.Source, indexer pdk.Indexer, colCount uint) *Ingester {
 	return &Ingester{
 		ParseConcurrency: 1,
 
 		src:     source,
 		indexer: indexer,
+
+		colCount: colCount,
 
 		// Reasonable defaults for crosscutting dependencies.
 		Stats: termstat.NewCollector(os.Stdout),
@@ -49,7 +53,7 @@ func (n *Ingester) Run() error {
 			var recordErr error
 			ii := 0
 			for {
-				if ii > 3000000 {
+				if ii > int(n.colCount) {
 					return
 				}
 				ii++
