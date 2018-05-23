@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	gopilosa "github.com/pilosa/go-pilosa"
 	"github.com/pilosa/pdk"
 	"github.com/pkg/errors"
 	"github.com/travisturner/importer"
@@ -91,8 +92,11 @@ func (m *Main) Run() error {
 		Frames: frames,
 	}
 
-	//indexer, err := pdk.SetupPilosa(m.PilosaHosts, m.Index, []pdk.FrameSpec{}, m.BatchSize)
-	indexer, err := pdk.SetupPilosa(m.PilosaHosts, m.Index, frames, m.BatchSize)
+	// Indexer
+	indexer, err := pdk.SetupPilosa(m.PilosaHosts, m.Index, frames,
+		gopilosa.OptImportStrategy(gopilosa.BatchImport),
+		gopilosa.OptImportBatchSize(int(m.BatchSize)))
+
 	if err != nil {
 		return errors.Wrap(err, "setting up Pilosa")
 	}
