@@ -53,7 +53,7 @@ func (n *Ingester) Run() error {
 			var recordErr error
 			ii := 0
 			for {
-				if ii > int(n.colCount) {
+				if ii >= int(n.colCount) {
 					return
 				}
 				ii++

@@ -2,7 +2,9 @@ package consumer
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
+	"sync"
 
 	gopilosa "github.com/pilosa/go-pilosa"
 	"github.com/pilosa/pdk"
@@ -46,14 +48,10 @@ func (s *EventSource) Record() (interface{}, error) {
 		if len(f.Fields) == 0 {
 			pr.AddRow(f.Name, uint64(rand.Intn(100)))
 		} else {
-			pr.AddVal(f.Name, "fld", int64(rand.Intn(1000000)))
+			pr.AddVal(f.Name, f.Name, int64(rand.Intn(1000000))) // NOTE: this assumes a single field with Name = frame.Name
 		}
 	}
 	s.count++
-
-	if s.count%100000 == 0 {
-		fmt.Println("count:", s.count)
-	}
 
 	return pr, nil
 }
@@ -62,45 +60,98 @@ func (s *EventSource) Record() (interface{}, error) {
 func (m *Main) Run() error {
 	frames := []pdk.FrameSpec{}
 
+	statusChans := []*importStatusChannel{}
+
 	// Bit Frames
 	for i := 0; i < int(m.FrameCount); i++ {
-		frames = append(frames, pdk.FrameSpec{
-			Name:           fmt.Sprintf("f%d", i),
-			CacheSize:      0,
-			InverseEnabled: false,
+		frameName := fmt.Sprintf("f%d", i)
+		ch := make(chan gopilosa.ImportStatusUpdate, 1000)
+		statusChans = append(statusChans, &importStatusChannel{
+			frame: frameName,
+			ch:    ch,
 		})
+		frames = append(frames, pdk.NewRankedFrameSpec(frameName, 0,
+			gopilosa.OptImportStatusChannel(ch),
+			gopilosa.OptImportStrategy(gopilosa.BatchImport),
+			gopilosa.OptImportBatchSize(int(m.BatchSize)),
+		))
 	}
 
 	// BSI Frames
 	for i := 0; i < int(m.ValCount); i++ {
-		fields := []pdk.FieldSpec{
-			pdk.FieldSpec{
-				Name: "fld",
-				Min:  0,
-				Max:  1000000,
-			},
-		}
-		frames = append(frames, pdk.FrameSpec{
-			Name:           fmt.Sprintf("v%d", i),
-			CacheSize:      0,
-			InverseEnabled: false,
-			Fields:         fields,
+		frameName := fmt.Sprintf("v%d", i)
+		ch := make(chan gopilosa.ImportStatusUpdate, 1000)
+		statusChans = append(statusChans, &importStatusChannel{
+			frame: frameName,
+			ch:    ch,
 		})
+		frames = append(frames, pdk.NewFieldFrameSpec(frameName, 0, math.MaxUint32,
+			gopilosa.OptImportStatusChannel(ch),
+			gopilosa.OptImportStrategy(gopilosa.BatchImport),
+			gopilosa.OptImportBatchSize(int(m.BatchSize)),
+		))
 	}
+
+	fmt.Println("frames: %v\n", frames)
 
 	src := &EventSource{
 		Frames: frames,
 	}
 
 	// Indexer
-	indexer, err := pdk.SetupPilosa(m.PilosaHosts, m.Index, frames,
-		gopilosa.OptImportStrategy(gopilosa.BatchImport),
-		gopilosa.OptImportBatchSize(int(m.BatchSize)))
-
+	indexer, err := pdk.SetupPilosa(m.PilosaHosts, m.Index, frames)
 	if err != nil {
 		return errors.Wrap(err, "setting up Pilosa")
 	}
 
 	ingester := importer.NewIngester(src, indexer, m.ColCount)
+
+	// take status off the channel and add them to indexer.Stats
+	go func() {
+		for status := range merge(statusChans...) {
+			// act on the status update
+			fmt.Printf("STATUS - frame: %s, thread: %d, slice: %d, count: %d, time: %v\n", status.frame, status.ThreadID, status.Slice, status.ImportedCount, status.Time)
+		}
+	}()
+
 	return errors.Wrap(ingester.Run(), "running ingester")
+}
+
+type importStatus struct {
+	gopilosa.ImportStatusUpdate
+	frame string
+}
+
+type importStatusChannel struct {
+	frame string
+	ch    <-chan gopilosa.ImportStatusUpdate
+}
+
+func merge(cs ...*importStatusChannel) <-chan importStatus {
+	var wg sync.WaitGroup
+	out := make(chan importStatus)
+
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls wg.Done.
+	output := func(c *importStatusChannel) {
+		for n := range c.ch {
+			out <- importStatus{
+				ImportStatusUpdate: n,
+				frame:              c.frame,
+			}
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	// Start a goroutine to close out once all the output goroutines are
+	// done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }

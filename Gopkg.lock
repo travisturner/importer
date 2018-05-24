@@ -100,8 +100,8 @@
     ".",
     "termstat"
   ]
-  revision = "d2b561dd48933e4eb5184d26090d64966e0b7203"
-  source = "github.com/yuce/pdk"
+  revision = "6caf54cb4ff2b4f1b4e55ee758a6be4f02704be9"
+  source = "github.com/travisturner/pdk"
 
 [[projects]]
   branch = "master"
@@ -182,7 +182,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "7c87d13f8e835d2fb3a70a2912c811ed0c1d241b"
+  revision = "77b0e4315053a57ed2962443614bdb28db152054"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -206,6 +206,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "98206e08822727b6ca45169344f53885ef8eed6e10fb4eb585f7f7d38f75abbf"
+  inputs-digest = "4b06f0be43a1b7f97c6c84d176a8c6e5428fcac0e85973b5775a969af180aeb9"
   solver-name = "gps-cdcl"
   solver-version = 1

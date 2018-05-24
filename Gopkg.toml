@@ -25,4 +25,4 @@
 [[constraint]]
   name = "github.com/pilosa/pdk"
   branch = "import-options"
-  source = "github.com/yuce/pdk"
+  source = "github.com/travisturner/pdk"
