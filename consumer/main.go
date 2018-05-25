@@ -20,6 +20,7 @@ type Main struct {
 	FrameCount  uint     `help:"Number of Frames to write single bits to."`
 	ValCount    uint     `help:"Number of Frames to write values to."`
 	ColCount    uint     `help:"Number of Columns to create."`
+	ThreadCount int      `help:"Number of worker threads to read the Record channel."`
 }
 
 // NewMain returns a new Main.
@@ -31,6 +32,7 @@ func NewMain() *Main {
 		FrameCount:  1,
 		ValCount:    1,
 		ColCount:    1000,
+		ThreadCount: 1,
 	}
 }
 
@@ -71,6 +73,7 @@ func (m *Main) Run() error {
 			ch:    ch,
 		})
 		frames = append(frames, pdk.NewRankedFrameSpec(frameName, 0,
+			gopilosa.OptImportThreadCount(m.ThreadCount),
 			gopilosa.OptImportStatusChannel(ch),
 			gopilosa.OptImportStrategy(gopilosa.BatchImport),
 			gopilosa.OptImportBatchSize(int(m.BatchSize)),
@@ -86,13 +89,12 @@ func (m *Main) Run() error {
 			ch:    ch,
 		})
 		frames = append(frames, pdk.NewFieldFrameSpec(frameName, 0, math.MaxUint32,
+			gopilosa.OptImportThreadCount(m.ThreadCount),
 			gopilosa.OptImportStatusChannel(ch),
 			gopilosa.OptImportStrategy(gopilosa.BatchImport),
 			gopilosa.OptImportBatchSize(int(m.BatchSize)),
 		))
 	}
-
-	fmt.Println("frames: %v\n", frames)
 
 	src := &EventSource{
 		Frames: frames,
